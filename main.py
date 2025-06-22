@@ -1,27 +1,21 @@
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ReplyKeyboardMarkup
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ReplyKeyboardMarkup
 from telegram.constants import ChatMemberStatus
-from telegram.ext import (
-    Application, CommandHandler, ContextTypes,
-    MessageHandler, filters, CallbackQueryHandler
-)
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 import logging
 
-# 🔐 Token va Admin ID
+# 🔐 TOKEN va ADMIN ID
 BOT_TOKEN = "8145474409:AAG_DCe3s3eP8PI2jaJHXZ2CRMVQCZuxwzY"
 ADMIN_ID = 7114973309
 
 # 📊 Ma'lumotlar
 user_db = set()
 left_users = set()
-required_channels = []  # Masalan: ["@YourChannel", "@YourGroup"]
+required_channels = []
 
-# 📝 Log
+# 🔍 Logging
 logging.basicConfig(level=logging.INFO)
 
-
-# 🎮 START komandasi
+# /start komandasi
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
@@ -46,16 +40,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗ O‘yinni boshlashdan oldin quyidagi kanallarga obuna bo‘ling:", reply_markup=reply_markup)
         return
 
-    # Obuna bo‘lganlar uchun
     game_button = InlineKeyboardButton("🎮 Join Game", web_app=WebAppInfo(url="https://coin-ton.vercel.app/"))
-    reply_markup = InlineKeyboardMarkup([[game_button]])
-    await update.message.reply_text("✅ Obuna tasdiqlandi. O‘yinni boshlang!", reply_markup=reply_markup)
+    await update.message.reply_text("✅ Obuna tasdiqlandi. O‘yinni boshlang!", reply_markup=InlineKeyboardMarkup([[game_button]]))
 
-
-# ⚙️ ADMIN komandasi
+# /admin komandasi
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id != ADMIN_ID:
+    if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ Bu bo‘lim faqat admin uchun.")
         return
 
@@ -67,8 +57,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("🔧 Admin menyusi:", reply_markup=keyboard)
 
-
-# 🧠 ADMIN xabarlarni boshqarish
+# Admin text handler
 async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
@@ -94,21 +83,18 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "📋 Ro‘yxat":
-        if not required_channels:
-            await update.message.reply_text("📭 Kanal ro‘yxati bo‘sh.")
-        else:
-            await update.message.reply_text("📋 Kanal ro‘yxati:\n" + "\n\n".join(required_channels))
+        msg = "\n".join(required_channels) if required_channels else "📭 Kanal ro‘yxati bo‘sh."
+        await update.message.reply_text(msg)
         return
 
     if text == "📊 Statistika":
-        await update.message.reply_text(f"👥 Umumiy foydalanuvchilar: {len(user_db)}\n \n🚪 Botdan chiqqanlar: {len(left_users)}")
+        await update.message.reply_text(f"👥 Umumiy foydalanuvchilar: {len(user_db)}\n🚪 Botdan chiqqanlar: {len(left_users)}")
         return
 
     if text == "⬅️ Ortga":
         await start(update, context)
         return
 
-    # Kanal qo‘shish holati
     if context.user_data.get("adding_channel"):
         if text.startswith("@"):
             required_channels.append(text)
@@ -117,14 +103,12 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Format noto‘g‘ri. @ bilan yozing.")
         context.user_data["adding_channel"] = False
 
-
-# 📌 INLINE tugma ishlovchi (Tekshirish va O‘chirish)
+# Callback handler
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    # ADMIN kanalni o‘chirish
     if query.data.startswith("remove_") and user_id == ADMIN_ID:
         index = int(query.data.replace("remove_", ""))
         if 0 <= index < len(required_channels):
@@ -134,7 +118,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🚫 Xatolik yuz berdi.")
         return
 
-    # OBUNA TEKSHIRISH
     if query.data == "check_subs":
         not_subscribed = []
         for ch in required_channels:
@@ -146,7 +129,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 not_subscribed.append(ch)
 
         if not_subscribed:
-            # Obuna bo‘lmaganlar uchun tugmalar
             buttons = [
                 [InlineKeyboardButton(f"📢 {ch}", url=f"https://t.me/{ch.lstrip('@')}")]
                 for ch in not_subscribed
@@ -156,21 +138,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🚫 Siz hali ham barcha kanallarga obuna bo‘lmagansiz:", reply_markup=reply_markup)
         else:
             game_button = InlineKeyboardButton("🎮 Join Game", web_app=WebAppInfo(url="https://coin-ton.vercel.app/"))
-            reply_markup = InlineKeyboardMarkup([[game_button]])
-            await query.edit_message_text("✅ Obuna tekshirildi. O‘yinga kirishingiz mumkin!", reply_markup=reply_markup)
-    
+            await query.edit_message_text("✅ Obuna tekshirildi. O‘yinga kirishingiz mumkin!", reply_markup=InlineKeyboardMarkup([[game_button]]))
 
-# 🚀 BOTNI ISHGA TUSHIRISH
+# RUN
 if __name__ == "__main__":
     app = Application.builder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), handle_admin_text))
     app.add_handler(CallbackQueryHandler(handle_callback))
-
     print("🤖 Bot ishga tushdi!")
     app.run_polling()
-
-
-
